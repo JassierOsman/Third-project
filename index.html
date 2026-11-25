@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Courtyard House · WebXR Hand-Tracking Walkthrough (1:1)</title>
+  <meta name="description" content="Walk through a life-size courtyard house in VR on Meta Quest 3 using only your hands, or on desktop with your webcam.">
+  <meta name="theme-color" content="#0e121a">
+  <link rel="stylesheet" href="./css/style.css">
+
+  <!-- Pinned CDN versions. Relative paths everywhere so the site works from a
+       GitHub Pages sub-directory (https://user.github.io/repo/). -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
+      "@mediapipe/tasks-vision": "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="scene" aria-label="3D view of the Courtyard House"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <div>
+        <h1>Courtyard House</h1>
+        <p>Life-size 1:1 walkthrough · hand-tracking locomotion</p>
+      </div>
+    </div>
+    <nav class="actions" aria-label="Controls">
+      <button id="btn-vr" class="btn btn-primary" disabled>Checking VR…</button>
+      <button id="btn-cam-start" class="btn">Start Camera</button>
+      <button id="btn-cam-stop" class="btn" disabled>Stop Camera</button>
+      <button id="btn-reset" class="btn">Reset Position</button>
+      <button id="btn-night" class="btn btn-ghost" aria-pressed="false">Night</button>
+      <button id="btn-help" class="btn btn-ghost btn-round" aria-label="Help">?</button>
+    </nav>
+    <p id="vr-note" class="vr-note">Checking for a VR headset…</p>
+  </header>
+
+  <aside id="debug" class="panel debug" aria-label="Debug information">
+    <header>
+      <span>Status</span>
+      <button id="btn-debug-toggle" class="icon-btn" aria-label="Collapse status panel">–</button>
+    </header>
+    <dl>
+      <div><dt>XR session</dt><dd id="d-xr">—</dd></div>
+      <div><dt>Hand tracking</dt><dd id="d-hands">—</dd></div>
+      <div><dt>Active hand</dt><dd id="d-active-hand">—</dd></div>
+      <div><dt>Active pinch</dt><dd id="d-pinch">—</dd></div>
+      <div><dt>Forward speed</dt><dd id="d-speed">—</dd></div>
+      <div><dt>Rotation speed</dt><dd id="d-turn">—</dd></div>
+      <div><dt>Scale</dt><dd id="d-scale">—</dd></div>
+      <div><dt>FPS</dt><dd id="d-fps">—</dd></div>
+      <div><dt>Position</dt><dd id="d-pos">—</dd></div>
+      <div class="wide"><dt>Pinch ratios</dt><dd id="d-ratios">—</dd></div>
+    </dl>
+  </aside>
+
+  <section id="cam-panel" class="panel cam hidden" aria-label="Webcam hand tracking">
+    <div class="cam-view">
+      <video id="cam-video" playsinline muted></video>
+      <canvas id="cam-overlay"></canvas>
+    </div>
+    <div id="cam-status" class="cam-status">Camera off</div>
+  </section>
+
+  <section class="gesture-guide" aria-label="Gesture guide">
+    <div class="g-cards">
+      <div class="g-card" data-gesture="turnLeft">
+        <div class="g-icon">◀</div>
+        <div><strong>Turn left</strong><span>Thumb + Ring</span></div>
+      </div>
+      <div class="g-card g-main" data-gesture="walk">
+        <div class="g-icon">▲</div>
+        <div><strong>Walk</strong><span>Thumb + Index</span></div>
+      </div>
+      <div class="g-card" data-gesture="turnRight">
+        <div class="g-icon">▶</div>
+        <div><strong>Turn right</strong><span>Thumb + Pinky</span></div>
+      </div>
+    </div>
+    <p class="g-keys">No camera? <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to move · drag to look · click glowing buttons · <kbd>N</kbd> night</p>
+  </section>
+
+  <section class="panel minimap" aria-label="Map">
+    <header>Map · click to jump</header>
+    <canvas id="minimap"></canvas>
+  </section>
+
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+
+  <dialog id="dlg-camera" class="dialog">
+    <h2>Use your webcam for hand tracking?</h2>
+    <p>Your hands are tracked with MediaPipe <strong>entirely in this browser</strong>. Video is never uploaded or recorded.</p>
+    <p class="muted">Your browser will ask for camera permission next. Keep your hand 40–70 cm from the camera, palm facing it.</p>
+    <div class="dialog-actions">
+      <button id="btn-cam-cancel" class="btn btn-ghost">Cancel</button>
+      <button id="btn-cam-allow" class="btn btn-primary">Allow &amp; start</button>
+    </div>
+  </dialog>
+
+  <dialog id="dlg-help" class="dialog">
+    <h2>Welcome to the Courtyard House</h2>
+    <p>A single-storey house around an open courtyard, built at <strong>real size (1:1)</strong>. Walk in through the front door.</p>
+    <ul class="help-list">
+      <li><span class="pill">Thumb + Index</span> walk forward where you look</li>
+      <li><span class="pill">Thumb + Ring</span> turn left</li>
+      <li><span class="pill">Thumb + Pinky</span> turn right</li>
+      <li><span class="pill">Let go</span> stop immediately</li>
+    </ul>
+    <p><strong>Interactive:</strong> doors open as you approach · touch (VR) or click (desktop) the glowing wall buttons to switch room lights · touch the orb in the courtyard to switch day / night.</p>
+    <p class="muted"><strong>Quest 3:</strong> open this page in Meta Quest Browser, press <em>Enter VR</em>, then put the controllers down.<br>
+    <strong>Desktop:</strong> press <em>Start Camera</em>, or use W A S D and drag to look.</p>
+    <div class="dialog-actions">
+      <button id="btn-help-close" class="btn btn-primary">Let's go</button>
+    </div>
+  </dialog>
+
+  <noscript><div class="noscript">This experience needs JavaScript enabled.</div></noscript>
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>
